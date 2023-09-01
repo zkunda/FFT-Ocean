@@ -92,7 +92,7 @@ public class WavesCascade
         initialSpectrumShader.Dispatch(KERNEL_CONJUGATE_SPECTRUM, size / LOCAL_WORK_GROUPS_X, size / LOCAL_WORK_GROUPS_Y, 1);
     }
 
-    public void CalculateWavesAtTime(float time)
+    public void CalculateWavesAtTime(float time, float deltaTime)
     {
         // Calculating complex amplitudes
         timeDependentSpectrumShader.SetTexture(KERNEL_TIME_DEPENDENT_SPECTRUMS, Dx_Dz_PROP, DxDz);
@@ -111,7 +111,7 @@ public class WavesCascade
         fft.IFFT2D(DxxDzz, buffer, true, false, true);
 
         // Filling displacement and normals textures
-        texturesMergerShader.SetFloat("DeltaTime", Time.deltaTime);
+        texturesMergerShader.SetFloat("DeltaTime", deltaTime);
 
         texturesMergerShader.SetTexture(KERNEL_RESULT_TEXTURES, Dx_Dz_PROP, DxDz);
         texturesMergerShader.SetTexture(KERNEL_RESULT_TEXTURES, Dy_Dxz_PROP, DyDxz);

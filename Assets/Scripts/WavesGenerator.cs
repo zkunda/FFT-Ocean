@@ -1,6 +1,7 @@
 ﻿using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Windows;
 
 public class WavesGenerator : MonoBehaviour
 {
@@ -64,20 +65,71 @@ public class WavesGenerator : MonoBehaviour
         Shader.SetGlobalFloat("LengthScale2", lengthScale2);
     }
 
+    private void SaveCascadeSequences()
+    {
+        var sliceCount = 32;
+        var current = RenderTexture.active;
+
+        for (int i = 0; i < 3; ++i)
+        {
+            Directory.CreateDirectory("Assets/c" + i.ToString() + "displament");
+            Directory.CreateDirectory("Assets/c" + i.ToString() + "derivates");
+            Directory.CreateDirectory("Assets/c" + i.ToString() + "turbulence");
+        }
+        var timeLen = 32.0f;
+        float deltaTime = timeLen / sliceCount;
+        for (int i = 0; i < sliceCount; ++i)
+        {
+            var time = i * deltaTime;
+            cascade0.CalculateWavesAtTime(time, deltaTime);
+            cascade1.CalculateWavesAtTime(time, deltaTime);
+            cascade2.CalculateWavesAtTime(time, deltaTime);
+
+            SaveRenderTexture("Assets/c0displament/t" + i.ToString() + ".asset", cascade0.Displacement);
+            SaveRenderTexture("Assets/c0derivates/t" + i.ToString() + ".asset", cascade0.Derivatives);
+            SaveRenderTexture("Assets/c0turbulence/t" + i.ToString() + ".asset", cascade0.Turbulence);
+
+            SaveRenderTexture("Assets/c1displament/t" + i.ToString() + ".asset", cascade1.Displacement);
+            SaveRenderTexture("Assets/c1derivates/t" + i.ToString() + ".asset", cascade1.Derivatives);
+            SaveRenderTexture("Assets/c1turbulence/t" + i.ToString() + ".asset", cascade1.Turbulence);
+
+            SaveRenderTexture("Assets/c2displament/t" + i.ToString() + ".asset", cascade2.Displacement);
+            SaveRenderTexture("Assets/c2derivates/t" + i.ToString() + ".asset", cascade2.Derivatives);
+            SaveRenderTexture("Assets/c2turbulence/t" + i.ToString() + ".asset", cascade2.Turbulence);
+        }
+
+        RenderTexture.active = current;
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+    }
+
+    private void SaveRenderTexture(string path, RenderTexture rt)
+    {
+        RenderTexture.active = rt;
+        Texture2D result = new Texture2D(rt.width, rt.height, TextureFormat.RGBAFloat, false);
+        result.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+        result.Apply();
+        AssetDatabase.CreateAsset(result, path);
+    }
+
     private void Update()
     {
+        if(UnityEngine.Input.GetKey(KeyCode.P))
+        {
+            SaveCascadeSequences();
+        }
+
         if (alwaysRecalculateInitials)
         {
             InitialiseCascades();
         }
 
-        cascade0.CalculateWavesAtTime(Time.time);
-        cascade1.CalculateWavesAtTime(Time.time);
-        cascade2.CalculateWavesAtTime(Time.time);
+        cascade0.CalculateWavesAtTime(Time.time, Time.deltaTime);
+        cascade1.CalculateWavesAtTime(Time.time, Time.deltaTime);
+        cascade2.CalculateWavesAtTime(Time.time, Time.deltaTime);
 
         RequestReadbacks();
     }
-
     Texture2D GetNoiseTexture(int size)
     {
         string filename = "GaussianNoiseTexture" + size.ToString() + "x" + size.ToString();
