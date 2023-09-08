@@ -2,7 +2,7 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Windows;
-
+using System.Collections.Generic;
 public class WavesGenerator : MonoBehaviour
 {
     public WavesCascade cascade0;
@@ -52,8 +52,10 @@ public class WavesGenerator : MonoBehaviour
         physicsReadback = new Texture2D(size, size, TextureFormat.RGBAFloat, false);
     }
 
+    int updateCount = 0;
     void InitialiseCascades()
     {
+        updateCount = 0;
         float boundary1 = 2 * Mathf.PI / lengthScale1 * 6f;
         float boundary2 = 2 * Mathf.PI / lengthScale2 * 6f;
         cascade0.CalculateInitials(wavesSettings, lengthScale0, 0.0001f, boundary1);
@@ -67,17 +69,40 @@ public class WavesGenerator : MonoBehaviour
 
     private void SaveCascadeSequences()
     {
-        var sliceCount = 32;
+        var sliceCount = 128;
         var current = RenderTexture.active;
 
-        for (int i = 0; i < 3; ++i)
-        {
-            Directory.CreateDirectory("Assets/c" + i.ToString() + "displament");
-            Directory.CreateDirectory("Assets/c" + i.ToString() + "derivates");
-            Directory.CreateDirectory("Assets/c" + i.ToString() + "turbulence");
-        }
-        var timeLen = 32.0f;
+        var c0disp = new Texture2D[sliceCount];
+        var c1disp = new Texture2D[sliceCount];
+        var c2disp = new Texture2D[sliceCount];
+        var c0deri = new Texture2D[sliceCount];
+        var c1deri = new Texture2D[sliceCount];
+        var c2deri = new Texture2D[sliceCount];
+        var c0turb = new Texture2D[sliceCount];
+        var c1turb = new Texture2D[sliceCount];
+        var c2turb = new Texture2D[sliceCount];
+        var timeLen = 2.0f;
         float deltaTime = timeLen / sliceCount;
+        for (int i = 0; i < sliceCount; ++i)
+        {
+            var time = i * deltaTime;
+            cascade2.CalculateWavesAtTime(time, deltaTime);
+            c2deri[i] = CopyRenderTexture(cascade2.Derivatives);
+        }
+
+        timeLen = 8.0f;
+        deltaTime = timeLen / sliceCount;
+        for (int i = 0; i < sliceCount; ++i)
+        {
+            var time = i * deltaTime;
+            cascade0.CalculateWavesAtTime(time, deltaTime);
+            cascade1.CalculateWavesAtTime(time, deltaTime);
+            cascade2.CalculateWavesAtTime(time, deltaTime);
+            c1deri[i] = CopyRenderTexture(cascade1.Derivatives);
+        }
+
+        timeLen = 32.0f;
+        deltaTime = timeLen / sliceCount;
         for (int i = 0; i < sliceCount; ++i)
         {
             var time = i * deltaTime;
@@ -85,22 +110,182 @@ public class WavesGenerator : MonoBehaviour
             cascade1.CalculateWavesAtTime(time, deltaTime);
             cascade2.CalculateWavesAtTime(time, deltaTime);
 
-            SaveRenderTexture("Assets/c0displament/t" + i.ToString() + ".asset", cascade0.Displacement);
-            SaveRenderTexture("Assets/c0derivates/t" + i.ToString() + ".asset", cascade0.Derivatives);
-            SaveRenderTexture("Assets/c0turbulence/t" + i.ToString() + ".asset", cascade0.Turbulence);
-
-            SaveRenderTexture("Assets/c1displament/t" + i.ToString() + ".asset", cascade1.Displacement);
-            SaveRenderTexture("Assets/c1derivates/t" + i.ToString() + ".asset", cascade1.Derivatives);
-            SaveRenderTexture("Assets/c1turbulence/t" + i.ToString() + ".asset", cascade1.Turbulence);
-
-            SaveRenderTexture("Assets/c2displament/t" + i.ToString() + ".asset", cascade2.Displacement);
-            SaveRenderTexture("Assets/c2derivates/t" + i.ToString() + ".asset", cascade2.Derivatives);
-            SaveRenderTexture("Assets/c2turbulence/t" + i.ToString() + ".asset", cascade2.Turbulence);
+            c0disp[i] = CopyRenderTexture(cascade0.Displacement);
+            c0deri[i] = CopyRenderTexture(cascade0.Derivatives);
         }
 
+        //Directory.CreateDirectory("Assets/c0displament");
+        BlendCycleTextures(c0disp);
+        BlendCycleTextures(c0deri);
+        BlendCycleTextures(c1deri);
+        BlendCycleTextures(c2deri);
+
+        SaveDerivatives("c0deri", c0deri);
+        SaveDerivatives("c1deri", c1deri);
+        SaveDerivatives("c2deri", c2deri);
+        var count = sliceCount / 2;
+        //for (int i = 0; i < count; ++i)
+        //{
+        //    AssetDatabase.CreateAsset(c0disp[i + count], "Assets/c0displament/t" + i.ToString() + ".asset");
+        //}
+
+        var offsets = new List<Color>();
+        var scalars = new List<Color>();
+        // count must equal 8 * 8
+        int columnCount = 8, rowCount = 8;
+        var tArray = new Texture2D(size * columnCount, size * rowCount, TextureFormat.RGBAFloat, false);
+        var colorData = tArray.GetPixels(0);
+        for (int i = 0; i < count; ++i)
+        {
+            var tex = c0disp[i + count];
+            var fData = tex.GetPixels(0);
+            var maxColor = new Color(float.MinValue, float.MinValue, float.MinValue, float.MinValue);
+            var minColor = new Color(float.MaxValue, float.MaxValue, float.MaxValue, float.MaxValue);
+            var colorRange = new Color();
+
+            for (int j = 0; j < fData.Length / 4; ++j)
+            {
+                var v = fData[j];
+                maxColor.r = Mathf.Max(maxColor.r, v.r);
+                maxColor.g = Mathf.Max(maxColor.g, v.g);
+                maxColor.b = Mathf.Max(maxColor.b, v.b);
+                maxColor.a = Mathf.Max(maxColor.a, v.a);
+
+                minColor.r = Mathf.Min(minColor.r, v.r);
+                minColor.g = Mathf.Min(minColor.g, v.g);
+                minColor.b = Mathf.Min(minColor.b, v.b);
+                minColor.a = Mathf.Min(minColor.a, v.a);
+            }
+
+            colorRange.r = maxColor.r - minColor.r;
+            colorRange.g = maxColor.g - minColor.g;
+            colorRange.b = maxColor.b - minColor.b;
+            colorRange.a = maxColor.a - minColor.a;
+
+            offsets.Add(minColor);
+            scalars.Add(colorRange);
+
+            var column = i % columnCount;
+            var row = (rowCount - 1) - i / columnCount;
+            for (int j = 0; j < fData.Length; ++j)
+            {
+                var v = fData[j];
+                var r = (v.r - minColor.r) / colorRange.r;
+                var g = (v.g - minColor.g) / colorRange.g;
+                var b = (v.b - minColor.b) / colorRange.b;
+                var a = (v.a - minColor.a) / colorRange.a;
+
+                var localColumn = j % size;
+                var localRow = j / size;
+                colorData[(row * size + localRow) * (size * columnCount) + (column * size + localColumn)] = v;// new Color(r, g, b, a);
+            }
+        }
+        tArray.SetPixels(colorData);
+        tArray.Apply();
+        var bytes = tArray.EncodeToEXR();
+        System.IO.File.WriteAllBytes("Assets/c0disp.exr", bytes);
+        /*var str = new string("{");
+        for (int i = 0; i < offsets.Count; ++i)
+        {
+            var ofs = offsets[i];
+            var scalar = scalars[i];
+            str += "float4(" + ofs.r.ToString() + ", " + ofs.g.ToString() + ", " + ofs.b.ToString() + ", " + ofs.a.ToString() + ")";
+            if (i != offsets.Count - 1)
+            {
+                str += ", ";
+            }
+        }
+        str += "}";
+        Debug.Log(str);*/
         RenderTexture.active = current;
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
+    }
+
+    private void SaveDerivatives(string name, Texture2D texture)
+    {
+        var outputTex = new Texture2D(texture.width, texture.height, TextureFormat.ARGB32, false);
+        var colorData = outputTex.GetPixels(0); 
+        var fData = texture.GetPixels(0);
+        for (int i = 0; i < texture.width; ++i)
+        {
+            for (int j = 0; j < texture.height; ++j)
+            {
+                var ofs = j * texture.width + i;
+                var v = fData[ofs];
+                var r = (v.r * 0.5f + 0.5f);
+                var g = (v.g * 0.5f + 0.5f);
+                var b = (v.b * 0.5f + 0.5f);
+                var a = (v.a * 0.5f + 0.5f);
+                colorData[ofs] = new Color(r, g, b, a);
+            }
+        }
+        outputTex.SetPixels(colorData);
+        outputTex.Apply();
+        var bytes = outputTex.EncodeToPNG();
+        System.IO.File.WriteAllBytes("Assets/" + name + ".png", bytes);
+    }
+
+    private void SaveDerivatives(string name, Texture2D[] textures)
+    {
+        var count = textures.Length / 2;
+        int columnCount = 8, rowCount = 8;
+        var tArray = new Texture2D(size * columnCount, size * rowCount, TextureFormat.RGBAFloat, false);
+        var colorData = tArray.GetPixels(0);
+        for (int i = 0; i < count; ++i)
+        {
+            var tex = textures[i + count];
+            var fData = tex.GetPixels(0);
+            var column = i % columnCount;
+            var row = (rowCount - 1) - i / columnCount;
+            for (int j = 0; j < fData.Length; ++j)
+            {
+                var v = fData[j];
+                var r = (v.r * 0.5f + 0.5f);
+                var g = (v.g * 0.5f + 0.5f);
+                var b = (v.b * 0.5f + 0.5f);
+                var a = (v.a * 0.5f + 0.5f);
+
+                var localColumn = j % size;
+                var localRow = j / size;
+                colorData[(row * size + localRow) * (size * columnCount) + (column * size + localColumn)] = v;// new Color(r, g, b, a);
+            }
+        }
+        tArray.SetPixels(colorData);
+        tArray.Apply();
+        var bytes = tArray.EncodeToEXR();
+        System.IO.File.WriteAllBytes("Assets/" + name + ".exr", bytes);
+    }
+
+    private void BlendCycleTextures(Texture2D [] texArray)
+    {
+        var half = texArray.Length / 2;
+        float interval = 1.0f / (1 + half);
+        for (int i = 0; i < half; ++i)
+        {
+            var t0Data = texArray[i].GetPixelData<float>(0);
+            var factor = interval * i;
+            var tex = texArray[i + half];
+            var tData = tex.GetPixelData<float>(0);
+            float hMin = float.MaxValue, hMax = float.MinValue;
+            for (int j = 0; j < tData.Length; ++j)
+            {
+                tData[j] = Mathf.Lerp(tData[j], t0Data[j], factor);
+                hMin = Mathf.Min(hMin, tData[j]);
+                hMax = Mathf.Max(hMax, tData[j]);
+            }
+            tex.SetPixelData<float>(tData, 0);
+            tex.Apply();
+        }
+    }
+
+    private Texture2D CopyRenderTexture(RenderTexture rt)
+    {
+        RenderTexture.active = rt;
+        Texture2D result = new Texture2D(rt.width, rt.height, TextureFormat.RGBAFloat, false);
+        result.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+        result.Apply();
+        return result;
     }
 
     private void SaveRenderTexture(string path, RenderTexture rt)
@@ -125,9 +310,12 @@ public class WavesGenerator : MonoBehaviour
         }
 
         cascade0.CalculateWavesAtTime(Time.time, Time.deltaTime);
-        cascade1.CalculateWavesAtTime(Time.time, Time.deltaTime);
-        cascade2.CalculateWavesAtTime(Time.time, Time.deltaTime);
-
+        //if (updateCount == 0)
+        {
+            cascade1.CalculateWavesAtTime(Time.time, Time.deltaTime);
+            cascade2.CalculateWavesAtTime(Time.time, Time.deltaTime);
+        }
+        ++updateCount;
         RequestReadbacks();
     }
     Texture2D GetNoiseTexture(int size)
