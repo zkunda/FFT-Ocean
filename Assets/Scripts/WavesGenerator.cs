@@ -133,7 +133,7 @@ public class WavesGenerator : MonoBehaviour
             // Compute denominator d. If d <= 0, segment is parallel to or points
             // away from triangle, so exit early
             float d = Vector3.Dot(-ray.direction, n);
-            if (d <= 0.0f) return null;
+            if (d <= 0.0f && (!bidirectional)) return null;
 
             // Compute intersection t value of pq with plane of triangle. A ray
             // intersects iff 0 <= t. Segment intersects iff 0 <= t <= 1. Delay
@@ -205,7 +205,7 @@ public class WavesGenerator : MonoBehaviour
                 {
                     var v = fData[j * size + k];
 
-                    grid[j, k].Set(v.r, v.g, j * gridSize + v.b);
+                    grid[j, k].Set(v.r, v.g, v.b);
                 }
             }
 
@@ -222,10 +222,10 @@ public class WavesGenerator : MonoBehaviour
                         {
                             for (int m = k - 5; m <= k + 5; ++m)
                             {
-                                var a = new Vector3(l * gridSize, 0, m * gridSize) + grid[(l + size) % size, (m + size) % size];
-                                var b = new Vector3(l * gridSize, 0, m * gridSize) + grid[(l + size) % size, (m + 1 + size) % size];
-                                var c = new Vector3(l * gridSize, 0, m * gridSize) + grid[(l + 1 + size) % size, (m + 1 + size) % size];
-                                var d = new Vector3(l * gridSize, 0, m * gridSize) + grid[(l + 1 + size) % size, (m + size) % size];
+                                var a = new Vector3(m * gridSize, 0, l * gridSize) + grid[(l + size) % size, (m + size) % size];
+                                var b = new Vector3((m + 1) * gridSize, 0, l * gridSize) + grid[(l + size) % size, (m + 1 + size) % size];
+                                var c = new Vector3((m + 1) * gridSize, 0, (l + 1) * gridSize) + grid[(l + 1 + size) % size, (m + 1 + size) % size];
+                                var d = new Vector3(m * gridSize, 0, (l + 1) * gridSize) + grid[(l + 1 + size) % size, (m + size) % size];
                                 //if (l < 0)
                                 //{
                                 //    a.z -= tileWidth;
