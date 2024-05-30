@@ -100,7 +100,7 @@
             #if defined(CLOSE)
             displacement += tex2Dlod(_Displacement_c2, worldUV / LengthScale2) * lod_c2;
             #endif*/
-            //v.vertex.xyz += mul(unity_WorldToObject,displacement);
+            v.vertex.xyz += mul(unity_WorldToObject,displacement);
 
             o.lodScales = float4(lod_c0, lod_c1, lod_c2, max(displacement.y - largeWavesBias * 0.8 - _SSSBase, 0) / _SSSScale);
         }
@@ -133,21 +133,21 @@
             #endif
 
             #if defined(CLOSE)
-            derivatives = tex2D(_Derivatives_c2, IN.worldUV / 5);// *IN.lodScales.z;
+            derivatives += tex2D(_Derivatives_c2, IN.worldUV / 5);// *IN.lodScales.z;
             #endif
 
             float2 slope = float2(derivatives.x / (1 + derivatives.z),
                 derivatives.y / (1 + derivatives.w));
             float3 worldNormal = normalize(float3(-slope.x, 1, -slope.y));
 
-            o.Normal = worldNormal;// WorldToTangentNormalVector(IN, worldNormal);
+            o.Normal = WorldToTangentNormalVector(IN, worldNormal);
             
-            /*#if defined(CLOSE)
+           //#if defined(CLOSE)
             float jacobian = tex2D(_Turbulence_c0, IN.worldUV / LengthScale0).x
                 + tex2D(_Turbulence_c1, IN.worldUV / LengthScale1).x
                 + tex2D(_Turbulence_c2, IN.worldUV / LengthScale2).x;
             jacobian = min(1, max(0, (-jacobian + _FoamBiasLOD2) * _FoamScale));
-            #elif defined(MID)
+            /*#elif defined(MID)
             float jacobian = tex2D(_Turbulence_c0, IN.worldUV / LengthScale0).x
                 + tex2D(_Turbulence_c1, IN.worldUV / LengthScale1).x;
             jacobian = min(1, max(0, (-jacobian + _FoamBiasLOD1) * _FoamScale));
@@ -161,12 +161,12 @@
                 LinearEyeDepth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, screenUV));
             float surfaceDepth = UNITY_Z_0_FAR_FROM_CLIPSPACE(IN.screenPos.z);
             float depthDifference = max(0, backgroundDepth - surfaceDepth - 0.1);
-            //float foam = tex2D(_FoamTexture, IN.worldUV * 0.5 + _Time.r).r;
-            //jacobian += _ContactFoam * saturate(max(0, foam - depthDifference) * 5) * 0.9;
+            float foam = tex2D(_FoamTexture, IN.worldUV * 0.25 + _Time.r).r;
+            jacobian += _ContactFoam * saturate(max(0, foam * 5 - depthDifference) * 5);
 
-            o.Albedo = float3(0, 0, 0);// _Color;// lerp(0, _FoamColor, jacobian);
+            o.Albedo = lerp(0, _FoamColor, jacobian);
             float distanceGloss = lerp(1 - _Roughness, _MaxGloss, 1 / (1 + length(IN.viewVector) * _RoughnessScale));
-            o.Smoothness = distanceGloss;// lerp(distanceGloss, 0, jacobian);
+            o.Smoothness = lerp(distanceGloss, 0, jacobian);
             o.Metallic = 0;
 
             float3 viewDir = normalize(IN.viewVector);
@@ -178,7 +178,7 @@
             fresnel = saturate(1 - fresnel);
             fresnel = pow5(fresnel);
 
-            o.Emission = 0;// lerp(color * (1 - fresnel), 0, jacobian);
+            o.Emission = lerp(color * (1 - fresnel), 0, jacobian);
         }
         ENDCG
     }
