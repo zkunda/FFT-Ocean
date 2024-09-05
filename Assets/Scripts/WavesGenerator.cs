@@ -186,15 +186,17 @@ public class WavesGenerator : MonoBehaviour
         SaveDerivatives(prefix + "Deri2", c2deri);
         var count = sliceCount / 2;
 
-        var waveHeightmapList = new List<byte[]>();
+        var wavemapList = new List<byte[]>();
 
         var tArray = new Texture2D(size * columnCount, size * rowCount, TextureFormat.RGBA32, false);
-        var colorData = tArray.GetPixels(0);
+        var colorData = tArray.GetPixels32(0);
         float tileWidth = lengthScale0;
         var gridSize = tileWidth / size;
         var ray = new Ray();
         ray.direction = Vector3.down;
         var grid = new Vector3[size, size];
+        Vector2 offsetX, offsetZ;
+        offsetX = offsetZ = Vector2.zero;
         for (int i = 0; i < count; ++i)
         {
             var tex = c0disp[i + count];
@@ -209,85 +211,92 @@ public class WavesGenerator : MonoBehaviour
                 }
             }
 
-            if (saveWaveData)
-            {
-                var heightmap = new byte[size * size];
-                for (int j = 0; j < size; ++j)
-                {
-                    for (int k = 0; k < size; ++k)
-                    {
-                        ray.origin = new Vector3((k + 0.5f) * gridSize, 100, (j + 0.5f) * gridSize);
-                        object hit = null;
-                        for (int l = j - 5; l <= j + 5; ++l)
-                        {
-                            for (int m = k - 5; m <= k + 5; ++m)
-                            {
-                                var a = new Vector3(m * gridSize, 0, l * gridSize) + grid[(l + size) % size, (m + size) % size];
-                                var b = new Vector3((m + 1) * gridSize, 0, l * gridSize) + grid[(l + size) % size, (m + 1 + size) % size];
-                                var c = new Vector3((m + 1) * gridSize, 0, (l + 1) * gridSize) + grid[(l + 1 + size) % size, (m + 1 + size) % size];
-                                var d = new Vector3(m * gridSize, 0, (l + 1) * gridSize) + grid[(l + 1 + size) % size, (m + size) % size];
-                                //if (l < 0)
-                                //{
-                                //    a.z -= tileWidth;
-                                //    b.z -= tileWidth;
-                                //}
-                                //else if (l >= size)
-                                //{
-                                //    c.z += tileWidth;
-                                //    d.z += tileWidth;
-                                //}
-                                //if (m < 0)
-                                //{
-                                //    a.x -= tileWidth;
-                                //    d.x -= tileWidth;
-                                //}
-                                //else if (m >= size)
-                                //{
-                                //    b.x += tileWidth;
-                                //    c.x += tileWidth;
-                                //}
-                                float maxX = Mathf.Max(d.x, Mathf.Max(c.x, Mathf.Max(a.x, b.x)));
-                                float maxZ = Mathf.Max(d.z, Mathf.Max(c.z, Mathf.Max(a.z, b.z)));
-                                float minX = Mathf.Min(d.x, Mathf.Min(c.x, Mathf.Min(a.x, b.x)));
-                                float minZ = Mathf.Min(d.z, Mathf.Min(c.z, Mathf.Min(a.z, b.z)));
-                                if (ray.origin.x > maxX || ray.origin.x < minX || ray.origin.z < minZ || ray.origin.z > maxZ)
-                                    continue;
+            //if (saveWaveData)
+            //{
+            //    var heightmap = new byte[size * size];
+            //    for (int j = 0; j < size; ++j)
+            //    {
+            //        for (int k = 0; k < size; ++k)
+            //        {
+            //            ray.origin = new Vector3((k + 0.5f) * gridSize, 100, (j + 0.5f) * gridSize);
+            //            object hit = null;
+            //            for (int l = j - 5; l <= j + 5; ++l)
+            //            {
+            //                for (int m = k - 5; m <= k + 5; ++m)
+            //                {
+            //                    var a = new Vector3(m * gridSize, 0, l * gridSize) + grid[(l + size) % size, (m + size) % size];
+            //                    var b = new Vector3((m + 1) * gridSize, 0, l * gridSize) + grid[(l + size) % size, (m + 1 + size) % size];
+            //                    var c = new Vector3((m + 1) * gridSize, 0, (l + 1) * gridSize) + grid[(l + 1 + size) % size, (m + 1 + size) % size];
+            //                    var d = new Vector3(m * gridSize, 0, (l + 1) * gridSize) + grid[(l + 1 + size) % size, (m + size) % size];
+            //                    //if (l < 0)
+            //                    //{
+            //                    //    a.z -= tileWidth;
+            //                    //    b.z -= tileWidth;
+            //                    //}
+            //                    //else if (l >= size)
+            //                    //{
+            //                    //    c.z += tileWidth;
+            //                    //    d.z += tileWidth;
+            //                    //}
+            //                    //if (m < 0)
+            //                    //{
+            //                    //    a.x -= tileWidth;
+            //                    //    d.x -= tileWidth;
+            //                    //}
+            //                    //else if (m >= size)
+            //                    //{
+            //                    //    b.x += tileWidth;
+            //                    //    c.x += tileWidth;
+            //                    //}
+            //                    float maxX = Mathf.Max(d.x, Mathf.Max(c.x, Mathf.Max(a.x, b.x)));
+            //                    float maxZ = Mathf.Max(d.z, Mathf.Max(c.z, Mathf.Max(a.z, b.z)));
+            //                    float minX = Mathf.Min(d.x, Mathf.Min(c.x, Mathf.Min(a.x, b.x)));
+            //                    float minZ = Mathf.Min(d.z, Mathf.Min(c.z, Mathf.Min(a.z, b.z)));
+            //                    if (ray.origin.x > maxX || ray.origin.x < minX || ray.origin.z < minZ || ray.origin.z > maxZ)
+            //                        continue;
 
-                                hit = IntersectRayTriangle(ray, a, c, b, true);
-                                if (hit == null)
-                                {
-                                    hit = IntersectRayTriangle(ray, a, d, c, true);
-                                    if (hit == null)
-                                        continue;
-                                }
+            //                    hit = IntersectRayTriangle(ray, a, c, b, true);
+            //                    if (hit == null)
+            //                    {
+            //                        hit = IntersectRayTriangle(ray, a, d, c, true);
+            //                        if (hit == null)
+            //                            continue;
+            //                    }
 
-                                byte h = (byte)(Mathf.Clamp(((RaycastHit)hit).point.y / 10.0f * 0.5f + 0.5f, 0, 1) * 255.0f);
-                                heightmap[j * size + k] = h;
-                                break;
-                            }
-                            if (hit != null)
-                                break;
-                        }
-                    }
-                }
-                waveHeightmapList.Add(heightmap);
-            }
+            //                    byte h = (byte)(Mathf.Clamp(((RaycastHit)hit).point.y / 10.0f * 0.5f + 0.5f, 0, 1) * 255.0f);
+            //                    heightmap[j * size + k] = h;
+            //                    break;
+            //                }
+            //                if (hit != null)
+            //                    break;
+            //            }
+            //        }
+            //    }
+            //    waveHeightmapList.Add(heightmap);
+            //}
             //SaveHeightmap("h" + i.ToString(), heightmap, size); // debug only
 
             var column = i % columnCount;
             var row = (rowCount - 1) - i / columnCount;
+            var waveData = new byte[size * size]; // heights
             for (int j = 0; j < fData.Length; ++j)
             {
                 var v = fData[j];
-                var r = Mathf.Clamp(v.r / 10.0f * 0.5f + 0.5f, 0, 1);
-                var g = Mathf.Clamp(v.g / 10.0f * 0.5f + 0.5f, 0, 1);
-                var b = Mathf.Clamp(v.b / 10.0f * 0.5f + 0.5f, 0, 1);
-                var a = Mathf.Clamp(v.a / 10.0f * 0.5f + 0.5f, 0, 1);
+                offsetX.x = Mathf.Max(v.r, offsetX.x);
+                offsetX.y = Mathf.Min(v.r, offsetX.y);
+                offsetZ.x = Mathf.Max(v.b, offsetZ.x);
+                offsetZ.y = Mathf.Min(v.b, offsetZ.y);
+                //var r = Mathf.Clamp(v.r / 10.0f * 0.5f + 0.5f, 0, 1);
+                var h = (byte)(255.0f * Mathf.Clamp(v.g / 10.0f * 0.5f + 0.5f, 0, 1));
+                //var b = Mathf.Clamp(v.b / 10.0f * 0.5f + 0.5f, 0, 1);
+               // var a = Mathf.Clamp(v.a / 10.0f * 0.5f + 0.5f, 0, 1);
+                waveData[j] = h;
 
                 var localColumn = j % size;
                 var localRow = j / size;
-                colorData[(row * size + localRow) * (size * columnCount) + (column * size + localColumn)] = new Color(r, g, b, a);
+                colorData[(row * size + localRow) * (size * columnCount) + (column * size + localColumn)] = new Color32(h, 0, 0, 1);
             }
+            wavemapList.Add(waveData);
         }
 
         if (saveWaveData)
@@ -298,14 +307,14 @@ public class WavesGenerator : MonoBehaviour
                 writter.Write(version);
                 writter.Write(count);
                 writter.Write(size);
-                foreach (var heightmap in waveHeightmapList)
+                foreach (var heightmap in wavemapList)
                 {
                     writter.Write(heightmap);
                 }
             }
         }
 
-        tArray.SetPixels(colorData);
+        tArray.SetPixels32(colorData);
         tArray.Apply();
         var bytes = tArray.EncodeToPNG();
         System.IO.File.WriteAllBytes("Assets/" + prefix + "Wave.png", bytes);
